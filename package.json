@@ -1,0 +1,25 @@
+{
+  "name": "better-mysql",
+  "version": "1.0.0",
+  "description": "A better and easier way of communicating with a mysql database in nodejs",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test\\basics.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Paultje52/better-mysql.git"
+  },
+  "keywords": [
+    "better",
+    "mysql",
+    "sql",
+    "better-mysql"
+  ],
+  "author": "Paultje52",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/Paultje52/better-mysql/issues"
+  },
+  "homepage": "https://0-0-2.gitbook.io/better-mysql/"
+}
