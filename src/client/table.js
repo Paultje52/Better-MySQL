@@ -1,12 +1,15 @@
 // The table class
 
 // Needed packages
-const isFunctionOfClass = require("./functions/index.js").isFunctionOfClass;
-const isArray = require("./functions/index.js").isArray;
+const isFunctionOfClass = require("../functions/index.js").isFunctionOfClass;
+const isArray = require("../functions/index.js").isArray;
 
 // Class
 module.exports = class {
   constructor(options) {
+    this.old = options.this;
+    this.queue = this.old.queue;
+    this.emit = this.old.emit;
     this.connection = options.connection;
     this.name = options.name;
     this.columns = options.columns;
@@ -16,32 +19,34 @@ module.exports = class {
   getAll() {
     let connection = this.connection;
     let name = this.name;
+    let queue = this.queue;
+    this.emit("sql", `SELECT * FROM ${name}`, "table", "getAll");
     return new Promise((resolve, reject) => {
-      connection.query(`SELECT * FROM ${name}`, (err, result, fields) => {
-        if (err) reject(err);
-        if (result.length === 0) resolve(null);
-        else {
-          let endResult = [];
-          let number = 0;
-          function json(is, thing, value, temp) {
-            if (is) temp[thing] = JSON.parse(value);
-            else temp[thing] = value;
-          }
-          result.forEach(res => {
-            let temp = {position_number: number};
-            for (let i in res) {
-              try {
-                JSON.parse(res[i]);
-                json(true, i, res[i], temp);
-              } catch(err) {
-                json(false, i, res[i], temp);
-              }
+      queue.add(() => {
+        connection.query(`SELECT * FROM ${name}`, (err, result, fields) => {
+          if (err) reject(err);
+          if (result.length === 0) resolve([]);
+          else {
+            let endResult = [];
+            function json(is, thing, value, temp) {
+              if (is) temp[thing] = JSON.parse(value);
+              else temp[thing] = value;
             }
-            endResult.push(temp);
-            number = number+1;
-          });
-          resolve(endResult);
-        }
+            result.forEach(res => {
+              let temp = {};
+              for (let i in res) {
+                try {
+                  JSON.parse(res[i]);
+                  json(true, i, res[i], temp);
+                } catch(err) {
+                  json(false, i, res[i], temp);
+                }
+              }
+              endResult.push(temp);
+            });
+            resolve(endResult);
+          }
+        });
       });
     });
   }
@@ -61,10 +66,14 @@ module.exports = class {
     let connection = this.connection;
     let name = this.name;
     let columns = this.columns;
+    let queue = this.queue;
+    this.emit("sql", `INSERT INTO ${name} (${columns}) VALUES ('${values.join("', '")}')`, "table", "add");
     return new Promise((resolve, reject) => {
-      connection.query(`INSERT INTO ${name} (${columns}) VALUES ('${values.join("', '")}')`, (err, result) => {
-        if (err) reject(err);
-        resolve(values);
+      queue.add(() => {
+        connection.query(`INSERT INTO ${name} (${columns}) VALUES ('${values.join("', '")}')`, (err, result) => {
+          if (err) reject(err);
+          resolve(`Added to ${name}: ${values.join("', '")}`);
+        });
       });
     });
   }
@@ -119,38 +128,42 @@ module.exports = class {
           sqlFilter.push(`\`${f.column}\` = '${f.keyword}'`);
       }
     });
+    let limit = filter.limit;
+    if (limit !== 0 && limit !== null) limit = `LIMIT ${limit}`;
+    else limit = "";
     // Mysql
     let connection = this.connection;
     let name = this.name;
+    let queue = this.queue;
+    this.emit("sql", `SELECT * FROM ${name} WHERE (${sqlFilter.join(`) ${filter.divide} (`)})`, "table", "where");
     return new Promise((resolve, reject) => {
-      let limit = filter.limit;
-      if (limit !== 0 && limit !== null) limit = `LIMIT ${limit}`;
-      else limit = "";
-      connection.query(`SELECT * FROM ${name} WHERE (${sqlFilter.join(`) ${filter.divide} (`)})`, (err, result, fields) => {
-        if (err) reject(err);
-        if (result.length === 0) resolve(null);
-        else {
-          let endResult = [];
-          let number = 0;
-          function json(is, thing, value, temp) {
-            if (is) temp[thing] = JSON.parse(value);
-            else temp[thing] = value;
-          }
-          let temp = {};
-          result.forEach(res => {
-            for (let i in res) {
-              try {
-                JSON.parse(res[i]);
-                json(true, i, res[i], temp);
-              } catch(err) {
-                json(false, i, res[i], temp);
-              }
+      queue.add(() => {
+        connection.query(`SELECT * FROM ${name} WHERE (${sqlFilter.join(`) ${filter.divide} (`)})`, (err, result, fields) => {
+          if (err) reject(err);
+          if (result.length === 0) resolve(null);
+          else {
+            let endResult = [];
+            let number = 0;
+            function json(is, thing, value, temp) {
+              if (is) temp[thing] = JSON.parse(value);
+              else temp[thing] = value;
             }
-            endResult.push(temp);
-            number = number+1;
-          });
-          resolve(endResult);
-        }
+            let temp = {};
+            result.forEach(res => {
+              for (let i in res) {
+                try {
+                  JSON.parse(res[i]);
+                  json(true, i, res[i], temp);
+                } catch(err) {
+                  json(false, i, res[i], temp);
+                }
+              }
+              endResult.push(temp);
+              number = number+1;
+            });
+            resolve(endResult);
+          }
+        });
       });
     });
   }
@@ -208,67 +221,72 @@ module.exports = class {
         }
       });
     }
+    let limit = filter.limit;
+    if (limit !== 0) limit = `LIMIT ${limit}`;
+    else limit = "";
     // Mysql
     let connection = this.connection;
     let name = this.name;
+    let queue = this.queue;
+    if (filter) this.emit("sql", `SELECT * FROM ${name} WHERE (${sqlFilter.join(`) ${filter.divide} (`)}) ORDER BY ${order}`, "table", "sort", "filter");
+    else this.emit("sql", `SELECT * FROM ${name} ORDER BY ${order}`, "table", "sort", "noFilter");
     return new Promise((resolve, reject) => {
-      if (filter) {
-        let limit = filter.limit;
-        if (limit !== 0) limit = `LIMIT ${limit}`;
-        else limit = "";
-        connection.query(`SELECT * FROM ${name} WHERE (${sqlFilter.join(`) ${filter.divide} (`)}) ORDER BY ${order}`, (err, result, fields) => {
-          if (err) reject(err);
-          if (result.length === 0) resolve(null);
-          else {
-            let endResult = [];
-            let number = 0;
-            function json(is, thing, value, temp) {
-              if (is) temp[thing] = JSON.parse(value);
-              else temp[thing] = value;
-            }
-            let temp = {};
-            result.forEach(res => {
-              for (let i in res) {
-                try {
-                  JSON.parse(res[i]);
-                  json(true, i, res[i], temp);
-                } catch(err) {
-                  json(false, i, res[i], temp);
-                }
+      queue.add(() => {
+        if (filter) {
+          connection.query(`SELECT * FROM ${name} WHERE (${sqlFilter.join(`) ${filter.divide} (`)}) ORDER BY ${order}`, (err, result, fields) => {
+            if (err) reject(err);
+            if (result.length === 0) resolve(null);
+            else {
+              let endResult = [];
+              let number = 0;
+              function json(is, thing, value, temp) {
+                if (is) temp[thing] = JSON.parse(value);
+                else temp[thing] = value;
               }
-              endResult.push(temp);
-              number = number+1;
-            });
-            resolve(endResult);
-          }
-        });
-      } else {
-        connection.query(`SELECT * FROM test ORDER BY name`, (err, result, fields) => {
-          if (err) reject(err);
-          if (result.length === 0) resolve(null);
-          else {
-            let endResult = [];
-            function json(is, thing, value, temp) {
-              if (is) temp[thing] = JSON.parse(value);
-              else temp[thing] = value;
-            }
-            let temp = {};
-            result.forEach(res => {
-              temp = {};
-              for (let i in res) {
-                try {
-                  JSON.parse(res[i]);
-                  json(true, i, res[i], temp);
-                } catch(err) {
-                  json(false, i, res[i], temp);
+              let temp = {};
+              result.forEach(res => {
+                for (let i in res) {
+                  try {
+                    JSON.parse(res[i]);
+                    json(true, i, res[i], temp);
+                  } catch(err) {
+                    json(false, i, res[i], temp);
+                  }
                 }
+                endResult.push(temp);
+                number = number+1;
+              });
+              resolve(endResult);
+            }
+          });
+        } else {
+          connection.query(`SELECT * FROM ${name} ORDER BY ${order}`, (err, result, fields) => {
+            if (err) reject(err);
+            if (result.length === 0) resolve(null);
+            else {
+              let endResult = [];
+              function json(is, thing, value, temp) {
+                if (is) temp[thing] = JSON.parse(value);
+                else temp[thing] = value;
               }
-              endResult.push(temp);
-            });
-            resolve(endResult);
-          }
-        });
-      }
+              let temp = {};
+              result.forEach(res => {
+                temp = {};
+                for (let i in res) {
+                  try {
+                    JSON.parse(res[i]);
+                    json(true, i, res[i], temp);
+                  } catch(err) {
+                    json(false, i, res[i], temp);
+                  }
+                }
+                endResult.push(temp);
+              });
+              resolve(endResult);
+            }
+          });
+        }
+      });
     });
   }
 
@@ -331,10 +349,14 @@ module.exports = class {
     // Mysql
     let name = this.name;
     let connection = this.connection;
+    let queue = this.queue;
+    this.emit("sql", `UPDATE ${name} SET ${n.column} = '${n.value}' WHERE ${sqlFilterOld} LIMIT ${limit}`, "table", "update");
     return new Promise((resolve, reject) => {
-      connection.query(`UPDATE ${name} SET ${n.column} = '${n.value}' WHERE ${sqlFilterOld} LIMIT ${limit}`, (err, result) => {
-        if (err) reject(err);
-        resolve(`${n.column} = ${n.value}`);
+      queue.add(() => {
+        connection.query(`UPDATE ${name} SET ${n.column} = '${n.value}' WHERE ${sqlFilterOld} LIMIT ${limit}`, (err, result) => {
+          if (err) reject(err);
+          resolve(`${n.column} = ${n.value}`);
+        });
       });
     });
   }
@@ -393,10 +415,14 @@ module.exports = class {
     // Mysql
     let name = this.name;
     let connection = this.connection;
+    let queue = this.queue;
+    this.emit("sql", `DELETE FROM ${name} WHERE ${sqlFilterOld} ${limit}`, "table", "update");
     return new Promise((resolve, reject) => {
-      connection.query(`DELETE FROM ${name} WHERE ${sqlFilterOld} ${limit}`, (err, result) => {
-        if (err) reject(err);
-        resolve("Deleted!");
+      queue.add(() => {
+        connection.query(`DELETE FROM ${name} WHERE ${sqlFilterOld} ${limit}`, (err, result) => {
+          if (err) reject(err);
+          resolve("Deleted!");
+        }); 
       });
     });
   }

@@ -1,5 +1,5 @@
 const package = require("better-mysql");
-let client = new package({
+let client = new package.client({
   host: "db4free.net",
   user: "YOURUSERNAME",
   pass: "YOURPASSWORD123"

@@ -5,6 +5,7 @@ const mysql = require("mysql");
 const eventEmitter = require("events");
 const database = require("./database.js");
 const filter = require("./filter");
+const queue = require("../queue.js");
 
 // Class
 module.exports = class client extends eventEmitter {
@@ -73,6 +74,11 @@ module.exports = class client extends eventEmitter {
     // Client extenders
     this.filter = filter;
 
+    // Queue
+    if (!options.queueInterval) options.queueInterval = 500;
+    if (!options.queue && typeof options.queue === "boolean") options.queueInterval = 10;
+    this.queue = new queue(options.queueInterval);
+
 
     // Backups
     /* SOON */
@@ -80,25 +86,32 @@ module.exports = class client extends eventEmitter {
 
   // Query (if you want to do something manual)
   query(opg) {
-    // this.emit("sql", opg, "index", "query");
+    this.emit("sql", opg, "index", "query");
+    let queue = this.queue;
     return new Promise((resolve, reject) => {
-      this.connection.query(opg, (err, result, ex) => {
-        if (err) reject(err);
-        resolve(result, ex);
+      queue.add(() => {
+        this.connection.query(opg, (err, result, ex) => {
+          if (err) reject(err);
+          resolve(result, ex);
+        });
       });
     });
   }
 
   // Get databases
   getDatabases() {
+    this.emit("sql", "SHOW DATABASES", "index", "getDatabases");
+    let queue = this.queue;
     return new Promise((resolve, reject) => {
-      this.connection.query(`SHOW DATABASES`, (err, result) => {
-        if (err) reject(err);
-        let databases = [];
-        result.forEach(res => {
-          databases.push(res.Database);
+      queue.add(() => {
+        this.connection.query("SHOW DATABASES", (err, result) => {
+          if (err) reject(err);
+          let databases = [];
+          result.forEach(res => {
+            databases.push(res.Database);
+          });
+          resolve(databases);
         });
-        resolve(databases);
       });
     });
   }
@@ -107,10 +120,14 @@ module.exports = class client extends eventEmitter {
   loadDatabase(name) {
     if (!name) throw "No name!";
     if (typeof name !== "string") throw "Invaled name!";
+    this.emit("sql", `USE ${name}`, "index", "loadDatabase");
+    let queue = this.queue;
     return new Promise((resolve, reject) => {
-      this.connection.query(`USE ${name}`, (err, result) => {
-        if (err) reject(err);
-        resolve(new database({this: this, name: name.toLowerCase(), connection: this.connection}));
+      queue.add(() => {
+        this.connection.query(`USE ${name}`, (err, result) => {
+          if (err) reject(err);
+          resolve(new database({this: this, name: name.toLowerCase(), connection: this.connection}));
+        });
       });
     });
   }
@@ -128,10 +145,14 @@ module.exports = class client extends eventEmitter {
   // Delete database
   deleteDatabase(name) {
     if (!name) throw "No database name!";
+    this.emit("sql", `DROP DATABASE ${name.toLowerCase()}`, "index", "deleteDatabase");
+    let queue = this.queue;
     return new Promise((resolve, reject) => {
-      this.connection.query(`DROP DATABASE ${name.toLowerCase()}`, (err) => {
-        if (err) reject(err);
-        resolve(`${name.toLowerCase()} deleted!`);
+      queue.add(() => {
+        this.connection.query(`DROP DATABASE ${name.toLowerCase()}`, (err) => {
+          if (err) reject(err);
+          resolve(`${name.toLowerCase()} deleted!`);
+        });
       });
     });
   }
@@ -140,10 +161,13 @@ module.exports = class client extends eventEmitter {
   renameDatabase(old, n) {
     if (!old) throw "No old database name!";
     if (!n) throw "No new database name!";
+    this.emit("sql", `ALTAR DATABASE ${old.toLowerCase()} MODIFY NAME = ${n.toLowerCase()}`, "index", "renameDatabase");
     return new Promise((resolve, reject) => {
-      this.connection.query(`ALTAR DATABASE ${old.toLowerCase()} MODIFY NAME = ${n.toLowerCase()}`, (err) => {
-        if (err) reject(err);
-        resolve(`${old.toLowerCase()} renamed to ${n.toLowerCase()}`);
+      queue.add(() => {
+        this.connection.query(`ALTAR DATABASE ${old.toLowerCase()} MODIFY NAME = ${n.toLowerCase()}`, (err) => {
+          if (err) reject(err);
+          resolve(`${old.toLowerCase()} renamed to ${n.toLowerCase()}`);
+        });
       });
     });
   }

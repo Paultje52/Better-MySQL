@@ -5,7 +5,10 @@ const table = require("./table.js");
 module.exports = class {
   // Constructor
   constructor(options) {
-    this.oldThis = options.this;
+    this.old = options.this;
+    this.queue = this.old.queue;
+    this.emit = this.old.emit;
+    this.queue = this.queue;
     this.connection = options.connection;
     this.name = options.name;
   }
@@ -14,14 +17,19 @@ module.exports = class {
   loadTable(name) {
     if (!name) throw "No name!";
     let connection = this.connection;
-    return new Promise(function(resolve, reject) {
-      connection.query(`SHOW COLUMNS FROM ${name.toLowerCase()}`, (err, result, fields) => {
-        if (err) reject(err);
-        let columns = [];
-        result.forEach(res => {
-          columns.push(res.Field);
+    let queue = this.queue;
+    let t = this;
+    this.emit("sql", `SHOW COLUMNS FROM ${name.toLowerCase()}`, "database", "loadTable");
+    return new Promise((resolve, reject) => {
+      queue.add(() => {
+        connection.query(`SHOW COLUMNS FROM ${name.toLowerCase()}`, (err, result, fields) => {
+          if (err) reject(err);
+          let columns = [];
+          result.forEach(res => {
+            columns.push(res.Field);
+          });
+          resolve(new table({this: t, connection: connection, name: name.toLowerCase(), columns: columns.join(", ")}));
         });
-        resolve(new table({connection: connection, name: name.toLowerCase(), columns: columns.join(", ")}));
       });
     });
   }
@@ -37,15 +45,20 @@ module.exports = class {
       throw "Invaled columns";
     }
     if (columns.includes("key")) throw "You can't use `key` in a name of a column.";
+    let cols = [];
+    columns.forEach(c => {
+      cols.push(`${c} VARCHAR(255)`);
+    });
     let connection = this.connection;
-    return new Promise(function(resolve, reject) {
-      let cols = [];
-      columns.forEach(c => {
-        cols.push(`${c} VARCHAR(255)`);
-      });
-      connection.query(`CREATE TABLE ${name.toLowerCase()} (${cols.join(", ")})`, (err, result) => {
-        if (err) reject(err);
-        resolve(new table({connection: connection, name: name.toLowerCase(), columns: columns.join(", ")}));
+    let queue = this.queue;
+    let t = this;
+    this.emit("sql", `CREATE TABLE ${name.toLowerCase()} (${cols.join(", ")})`, "database", "loadTable");
+    return new Promise((resolve, reject) => {
+      queue.add(() => {
+        connection.query(`CREATE TABLE ${name.toLowerCase()} (${cols.join(", ")})`, (err, result) => {
+          if (err) reject(err);
+          resolve(new table({this: t, connection: connection, name: name.toLowerCase(), columns: columns.join(", ")}));
+        });
       });
     });
   }
@@ -67,48 +80,71 @@ module.exports = class {
         });
       }
       let connection = this.connection;
+      let queue = this.queue;
+      this.emit("sql", `ALTAR TABLE ${table.toLowerCase()} ADD ${finalAddColumns.join(", ")}`, "database", "chanceTable", "add_column");
       return new Promise((resolve, reject) => {
-        connection.query(`ALTAR TABLE ${table.toLowerCase()} ADD ${finalAddColumns.join(", ")}`, (err, result) => {
-          if (err) reject(err);
-          resolve(`Added ${finalAddColumns.join(", ")} to ${table.toLowerCase()}`);
+        queue.add(() => {
+          connection.query(`ALTAR TABLE ${table.toLowerCase()} ADD ${finalAddColumns.join(", ")}`, (err, result) => {
+            if (err) reject(err);
+            resolve(`Added ${finalAddColumns.join(", ")} to ${table.toLowerCase()}`);
+          });
         });
       });
     } else if (action === "rename_column") {
       if (!v) throw "No old column name!";
       if (!va) throw "No new column name!";
       let connection = this.connection;
+      let queue = this.queue;
+      this.emit("sql", `ALTER TABLE ${table.toLowerCase()} CHANGE ${v} ${va} VARCHAR(255)`, "database", "chanceTable", "rename_column");
       return new Promise((resolve, reject) => {
-        connection.query(`ALTER TABLE ${table.toLowerCase()} CHANGE ${v} ${va} VARCHAR(255)`, (err, result) => {
-          if (err) reject(err);
-          resolve(`Table ${table.toLowerCase()}: Column ${v} renamed to ${va}`);
+        queue.add(() => {
+          connection.query(`ALTER TABLE ${table.toLowerCase()} CHANGE ${v} ${va} VARCHAR(255)`, (err, result) => {
+            if (err) reject(err);
+            resolve(`Table ${table.toLowerCase()}: Column ${v} renamed to ${va}`);
+          });
         });
       });
     } else if (action === "delete_column") {
       if (!v) throw "No column name!"
       let connection = this.connection;
+      let queue = this.queue;
+      this.emit("sql", `ALTAR TABLE ${table.toLowerCase()} DROP ${v}`, "database", "chanceTable", "delete_column");
       return new Promise((resolve, reject) => {
-        connection.query(`ALTAR TABLE ${table.toLowerCase()} DROP ${v}`, (err, result) => {
-          if (err) reject(err);
-          resolve(`Column ${v} deleted in ${table.toLowerCase()}`);
+        queue.add(() => {
+          connection.query(`ALTAR TABLE ${table.toLowerCase()} DROP ${v}`, (err, result) => {
+            if (err) reject(err);
+            resolve(`Column ${v} deleted in ${table.toLowerCase()}`);
+          });
         });
       });
     } else if (action === "clear") {
       let connection = this.connection;
+      let queue = this.queue;
+      this.emit("sql", `DELETE FROM ${table.toLowerCase()}`, "database", "chanceTable", "clear");
       return new Promise((resolve, reject) => {
-        connection.query(`DELETE FROM ${table.toLowerCase()}`, (err, result) => {
-          if (err) reject(err);
-          resolve(`All rows in ${table.toLowerCase()} cleared!`);
+        queue.add(() => {
+          connection.query(`DELETE FROM ${table.toLowerCase()}`, (err, result) => {
+            if (err) reject(err);
+            resolve(`All rows in ${table.toLowerCase()} cleared!`);
+          });
         });
       });
     } else if (action === "clone") {
       if (!v) throw "No clone table name!";
       let connection = this.connection;
+      let queue = this.queue;
+      this.emit("sql", `CREATE TABLE ${v.toLowerCase()} LIKE ${table.toLowerCase()}`, "database", "chanceTable", "clone");
+      this.emit("sql", `INSERT ${v.toLowerCase()} SELECT * FROM ${table.toLowerCase()}`, "database", "chanceTable", "clone");
       return new Promise((resolve, reject) => {
-        connection.query(`CREATE TABLE ${v.toLowerCase()} LIKE ${table.toLowerCase()}`, (err, result) => {
-          if (err) reject(`Error while creating table ${v.toLowerCase()}: ${err}`);
-          connection.query(`INSERT ${v.toLowerCase()} SELECT * FROM ${table.toLowerCase()}`, (err) => {
-            if (err) reject(err);
-            resolve(`${table.toLowerCase()} cloned to ${v.toLowerCase()}`);
+        queue.add(() => {
+          connection.query(`CREATE TABLE ${v.toLowerCase()} LIKE ${table.toLowerCase()}`, (err, result) => {
+            if (err) reject(`Error while creating table ${v.toLowerCase()}: ${err}`);
+            queue.add(() => {
+              connection.query(`INSERT ${v.toLowerCase()} SELECT * FROM ${table.toLowerCase()}`, (err) => {
+                if (err) reject(err);
+                resolve(`${table.toLowerCase()} cloned to ${v.toLowerCase()}`);
+              });
+            });
           });
         });
       });
@@ -119,14 +155,18 @@ module.exports = class {
   getTables() {
     let connection = this.connection;
     let name = this.name;
+    let queue = this.queue;
+    this.emit("sql", `SELECT * FROM information_schema.tables WHERE TABLE_SCHEMA = '${name}'`, "database", "getTables");
     return new Promise((resolve, reject) => {
-      connection.query(`SELECT * FROM information_schema.tables WHERE TABLE_SCHEMA = '${name}'`, (err, result) => {
-        if (err) reject(err);
-        let endResult = [];
-        result.forEach(res => {
-          endResult.push(res.TABLE_NAME);
+      queue.add(() => {
+        connection.query(`SELECT * FROM information_schema.tables WHERE TABLE_SCHEMA = '${name}'`, (err, result) => {
+          if (err) reject(err);
+          let endResult = [];
+          result.forEach(res => {
+            endResult.push(res.TABLE_NAME);
+          });
+          resolve(endResult);
         });
-        resolve(endResult);
       });
     });
   }
@@ -135,12 +175,19 @@ module.exports = class {
   deleteTable(name) {
     if (!name) throw "No name!";
     let connection = this.connection;
-    return new Promise(function(resolve, reject) {
-      connection.query(`SELECT * FROM ${name.toLowerCase()}`, (err, result, fields) => {
-        if (err) reject(err);
-        connection.query(`DROP TABLE ${name.toLowerCase()}`, (err, result) => {
+    let queue = this.queue;
+    this.emit("sql", `SELECT * FROM ${name.toLowerCase()}`, "database", "deleteTable");
+    this.emit("sql", `DROP TABLE ${name.toLowerCase()}`, "database", "deleteTable");
+    return new Promise((resolve, reject) => {
+      queue.add(() => {
+        connection.query(`SELECT * FROM ${name.toLowerCase()}`, (err, result, fields) => {
           if (err) reject(err);
-          resolve(fields);
+          queue.add(() => {
+            connection.query(`DROP TABLE ${name.toLowerCase()}`, (err, result) => {
+              if (err) reject(err);
+              resolve(fields);
+            });
+          });
         });
       });
     });
