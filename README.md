@@ -1,5 +1,4 @@
 # better-mysql
-Makkelijk met mysql databases werken in nodejs!
 _Better-mysql_ is a NodeJS package. With this package you can communicate with a MySQL database with simple code. You can even use _better-MySQL_ without knowing SQL!
 
 ## How does it work?
