@@ -1,6 +1,7 @@
 // Queue
 module.exports = class {
   constructor(interval) {
+    if (!interval) interval = 500;
     this.interval = interval;
     this.queue = [];
 
