@@ -16,6 +16,13 @@ module.exports = class {
     this.columnsArray = this.columns.split(", ");
   }
 
+  // Use
+  use(thing) {
+    if (!thing) throw "No use thing!";
+    if (typeof thing !== "function") throw "The use thing has to be a function!";
+    return thing(this, "table");
+  }
+
   getAll() {
     let connection = this.connection;
     let name = this.name;
@@ -342,7 +349,6 @@ module.exports = class {
     });
 
     // New
-    console.log(n);
     if (!n) throw "No new thing!";
     if (!n.column) throw "No new column!";
     if (!n.value) throw "No new value!";

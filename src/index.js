@@ -1,6 +1,6 @@
 // Exporting!
 module.exports = {
-  client: require("./client/index.js"),
+  client: require("./client"),
   queue: require("./queue.js"),
-  function: require("./functions/index.js")
+  function: require("./functions")
 }

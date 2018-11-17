@@ -73,6 +73,7 @@ module.exports = class client extends eventEmitter {
 
     // Client extenders
     this.filter = filter;
+    this.extenders = require("./client_extenders");
 
     // Queue
     if (!options.queueInterval) options.queueInterval = 500;
@@ -82,6 +83,13 @@ module.exports = class client extends eventEmitter {
 
     // Backups
     /* SOON */
+  }
+
+  // Use
+  use(thing) {
+    if (!thing) throw "No use thing!";
+    if (typeof thing !== "function") throw "The use thing has to be a function!";
+    return thing(this, "index");
   }
 
   // Query (if you want to do something manual)

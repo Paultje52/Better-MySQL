@@ -13,6 +13,33 @@ module.exports = class {
     this.name = options.name;
   }
 
+  // Use
+  use(thing) {
+    if (!thing) throw "No use thing!";
+    if (typeof thing !== "function") throw "The use thing has to be a function!";
+    return thing(this, "database");
+  }
+
+  // get columns
+  getColumns(table) {
+    if (!table) throw "No table!";
+    let connection = this.connection;
+    let queue = this.queue;
+    this.emit("sql", `SHOW COLUMNS FROM ${table.toLowerCase()}`, "database", "loadTable");
+    return new Promise((resolve, reject) => {
+      queue.add(() => {
+        connection.query(`SHOW COLUMNS FROM ${table.toLowerCase()}`, (err, result) => {
+          if (err) reject(err);
+          let columns = [];
+          result.forEach(res => {
+            columns.push(res.Field);
+          });
+          resolve(columns);
+        });
+      });
+    });
+  }
+
   // Load table
   loadTable(name) {
     if (!name) throw "No name!";
@@ -22,7 +49,7 @@ module.exports = class {
     this.emit("sql", `SHOW COLUMNS FROM ${name.toLowerCase()}`, "database", "loadTable");
     return new Promise((resolve, reject) => {
       queue.add(() => {
-        connection.query(`SHOW COLUMNS FROM ${name.toLowerCase()}`, (err, result, fields) => {
+        connection.query(`SHOW COLUMNS FROM ${name.toLowerCase()}`, (err, result) => {
           if (err) reject(err);
           let columns = [];
           result.forEach(res => {

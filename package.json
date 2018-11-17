@@ -1,6 +1,6 @@
 {
   "name": "better-mysql",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "A better and easier way of communicating with a mysql database in nodejs",
   "main": "index.js",
   "scripts": {
