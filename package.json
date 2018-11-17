@@ -2,9 +2,9 @@
   "name": "better-mysql",
   "version": "1.2.0",
   "description": "A better and easier way of communicating with a mysql database in nodejs",
-  "main": "index.js",
+  "main": "src\\index.js",
   "scripts": {
-    "test": "node test\\basics.js"
+    "test": "node tests\\basics.js"
   },
   "repository": {
     "type": "git",
