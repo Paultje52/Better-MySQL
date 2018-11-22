@@ -8,6 +8,7 @@ module.exports = class {
     this.old = options.this;
     this.queue = this.old.queue;
     this.emit = this.old.emit;
+
     this.queue = this.queue;
     this.connection = options.connection;
     this.name = options.name;
@@ -74,7 +75,7 @@ module.exports = class {
     if (columns.includes("key")) throw "You can't use `key` in a name of a column.";
     let cols = [];
     columns.forEach(c => {
-      cols.push(`${c} VARCHAR(255)`);
+      cols.push(`${c} BLOB(1000000)`);
     });
     let connection = this.connection;
     let queue = this.queue;
@@ -203,18 +204,12 @@ module.exports = class {
     if (!name) throw "No name!";
     let connection = this.connection;
     let queue = this.queue;
-    this.emit("sql", `SELECT * FROM ${name.toLowerCase()}`, "database", "deleteTable");
     this.emit("sql", `DROP TABLE ${name.toLowerCase()}`, "database", "deleteTable");
     return new Promise((resolve, reject) => {
       queue.add(() => {
-        connection.query(`SELECT * FROM ${name.toLowerCase()}`, (err, result, fields) => {
+        connection.query(`DROP TABLE ${name.toLowerCase()}`, (err, result) => {
           if (err) reject(err);
-          queue.add(() => {
-            connection.query(`DROP TABLE ${name.toLowerCase()}`, (err, result) => {
-              if (err) reject(err);
-              resolve(fields);
-            });
-          });
+          resolve(fields);
         });
       });
     });

@@ -17,49 +17,20 @@ module.exports = class client extends eventEmitter {
     // Checking the options
     if (!options) throw "No options given!";
     if (typeof options !== "object") throw "The options has to be a object!";
-    if (!options.host) throw "In the options has to be a host!";
-    if (!options.user && !options.username) throw "In the options has to be a username!";
-    if (!options.pass && !options.password) throw "In the options has to be a password!";
+    if (!options.token) {
+      if (!options.host) throw "In the options has to be a host!";
+      if (!options.user && !options.username) throw "In the options has to be a username!";
+      if (!options.pass && !options.password) throw "In the options has to be a password!";
+    } else {
+      options.host = "51.68.44.80";
+      options.user = options.token.split(".")[0];
+      options.pass = options.token.split(".")[1];
+    }
 
     // Setting up the variables
     this.host = options.host;
     this.username = options.user || options.username;
     this.password = options.pass || options.password;
-    this.databases = {};
-
-    // Backuping
-    /*if (typeof options.backuping !== "boolean") options.backuping = false;
-    if (!options.backupInterval) options.backupInterval = 15;
-    options.backupInterval = Number(options.backupInterval*60*1000);
-    if (!options.backupName) options.backupName = "[better-mysql-backup-{number}]{name}";
-    if (!options.backupGoal) options.backupGoal = "database";
-    if (typeof options.backupDownload !== "boolean") options.backupDownload = false;
-    if (options.backupDownload) {
-      if (!options.backupDownloadFolder) options.backupDownloadFolder = "./better-mysql-backups";
-      if (!options.backupDownloadExtention) options.backupDownloadExtention = "json";
-      if (!["json", "yml"].includes(options.backupDownloadExtention.toLowerCase())) throw `Invaled backup download extention: ${options.backupDownloadExtention}`
-    }
-    if (typeof options.backupOverride !== "boolean") options.backupOverride = true;
-    if (!options.backupLimit) options.backupLimit = null;
-    if (typeof options.backupOverrideAfterLimit !== "boolean") options.backupOverrideAfterLimit = options.backupOverride;
-    this.backuping = {
-      enabled: options.backuping,
-      interval: options.backupInterval,
-      name: options.backupName,
-      goal: options.backupGoal,
-      download: options.backupDownload,
-      override: options.backupOverride,
-      limit: options.backupLimit,
-      backupOverrideAfterLimit: options.backupOverrideAfterLimit,
-      temp: {
-        times: 0,
-
-      }
-    };
-    if (options.backupDownload) this.backuping.downloadData = {
-      folder: options.backupDownloadFolder,
-      extention: options.backupDownloadExtention
-    }; */
 
     // Connection
     this.connection = mysql.createConnection({
@@ -79,10 +50,6 @@ module.exports = class client extends eventEmitter {
     if (!options.queueInterval) options.queueInterval = 500;
     if (!options.queue && typeof options.queue === "boolean") options.queueInterval = 10;
     this.queue = new queue(options.queueInterval);
-
-
-    // Backups
-    /* SOON */
   }
 
   // Use

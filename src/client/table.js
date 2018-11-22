@@ -10,6 +10,7 @@ module.exports = class {
     this.old = options.this;
     this.queue = this.old.queue;
     this.emit = this.old.emit;
+
     this.connection = options.connection;
     this.name = options.name;
     this.columns = options.columns;
