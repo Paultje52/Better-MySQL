@@ -51,8 +51,11 @@ module.exports = function(thing, place) {
     get(key, path) {
       if (!key) throw "No key!";
       if (this.memory) {
-        if (!key.includes(".")) return this.data[key];
-        else return this.data[key.split(".")[0]][key.split(".").slice(1)]
+        let data;
+        if (!key.includes(".")) data = this.data[key];
+        else data = this.data[key.split(".")[0]][key.split(".").slice(1)];
+        if (typeof data === "object") data = JSON.parse(data);
+        return data;
       } else {
         let connection = this.connection;
         return new Promise(async (resolve, reject) => {
