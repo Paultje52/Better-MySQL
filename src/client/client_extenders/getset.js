@@ -54,7 +54,6 @@ module.exports = function(thing, place) {
         let data;
         if (!key.includes(".")) data = this.data[key];
         else data = this.data[key.split(".")[0]][key.split(".").slice(1)];
-        if (typeof data === "object") data = JSON.parse(data);
         return data;
       } else {
         let connection = this.connection;
@@ -84,7 +83,6 @@ module.exports = function(thing, place) {
     set(key, value, path) {
       if (!key) throw "No key to set!";
       if (!value) throw "No value to set!";
-      if (typeof value === "object") value = JSON.stringify(value);
       if (this.memory) {
         let exits = false;
         if (key.includes(".")) {
