@@ -19,19 +19,22 @@ module.exports = function(thing, place) {
         this.connection = await thing.loadTable(tableName);
         if (memory) {
           this.allData = await this.connection.getAll();
-          this.data = {};
-            function json(is, thing, value, data) {
-              if (is) data[thing] = JSON.parse(value);
-              else data[thing] = value;
-            }
-          this.allData.forEach(data => {
-            try {
-              JSON.parse(data.v);
-              json(true, data.k, data.v, this.data);
-            } catch(err) {
-              json(false, data.k, data.v, this.data);
-            }
-          });
+          if (this.allData.length === 0) this.data = {};
+          else {
+            this.data = {};
+              function json(is, thing, value, data) {
+                if (is) data[thing] = JSON.parse(value);
+                else data[thing] = value;
+              }
+            this.allData.forEach(data => {
+              try {
+                JSON.parse(data.v);
+                json(true, data.k, data.v, this.data);
+              } catch(err) {
+                json(false, data.k, data.v, this.data);
+              }
+            });
+          }
         }
         this.readyState = "ready";
         this.ready = true;
